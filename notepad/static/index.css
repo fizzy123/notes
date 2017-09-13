@@ -1,0 +1,26 @@
+body {
+  margin: 0px;
+  text-align: left;
+}
+
+#content {
+  width: 100%;
+}
+
+*:focus {
+  outline: none;
+}
+
+div {
+  display: -webkit-inline-box;
+}
+
+.click {
+  cursor: pointer;
+}
+
+.selection {
+  cursor: pointer;
+}
+
+

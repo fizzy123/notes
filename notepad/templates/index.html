@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{key}}</title>
+  <link href="{{ url_for('static', filename='index.css') }}" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+  <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='cursor.js') }}"></script>
+  {% if not readonly %}
+  <script type="text/javascript">
+    var csrftoken = "{{ csrf_token() }}";
+    function csrfSafeMethod(method) {
+      // these HTTP methods do not require CSRF protection
+      return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+    }
+    $.ajaxSetup({
+      beforeSend: function(xhr, settings) {
+        if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+          xhr.setRequestHeader("X-CSRFToken", csrftoken);
+        }
+      }
+    });
+
+
+    var pageKey = '{{key}}'
+    var firstMessage = true;
+    var divCloseLength = "</div>".length
+
+		jQuery(document).ready(function($) {
+      var socket = io.connect();
+
+      // disable select all
+      $(document).keydown(function(objEvent) {        
+        if (objEvent.ctrlKey) {  
+          if (objEvent.keyCode == 65) {
+            objEvent.preventDefault();
+            return false;
+          }
+        }
+      });
+      var clickOpenLength = "<div class='click'>".length
+      var selectionOpenLength = "<div class='selection'>".length
+
+      var getIndexFromSelection = function(node, offset) {
+        if (node.id === 'content') {
+          node = node.childNodes[offset]
+        }
+        var count = 0
+        if (node.parentNode.className === 'click' ||
+            node.parentNode.className === 'selection') {
+          node = node.parentNode
+        }
+
+        if (node.nodeType === Node.TEXT_NODE) {
+          count = offset
+        } else if (node.nodeName === 'DIV') {
+          if (node.className === 'click') {
+            count = offset + clickOpenLength
+          } else if (node.className === 'selection') {
+            count = offset + selectionOpenLength
+          }
+        }
+
+        if (node.previousSibling) {
+          node = node.previousSibling;
+        } else {
+          node = node.parentNode;
+        }
+        while (node.id !== 'content') {
+          if (node.nodeType === Node.TEXT_NODE) {
+            count += node.length
+          } else if (node.nodeName === 'BR') {
+            count += '<br>'.length
+          } else {
+            var div = $(node).wrap('<div>').parent().html()
+            $(node).unwrap()
+            count += div.length
+          }
+
+          if (node.previousSibling) {
+            node = node.previousSibling;
+          } else {
+            node = node.parentNode;
+          }
+        }
+        return count
+      }
+
+      function clearSelection(clickedElement) {
+        if ($('.selection').length) {
+          var selectionHtml = $('.selection').wrap('<div>').parent().html()
+          $('.selection').unwrap()
+          $(clickedElement).attr('id', 'clicked')
+          var removedHtml = $('#content').html().replace(selectionHtml, selectionHtml.slice(selectionOpenLength, selectionHtml.length-6))
+          $('#content').html(removedHtml)
+          $('.click').click(linkClick) // reseting html removes click handlers
+          // click handler doesn't trigger for some reason so I'll trigger it manually
+          console.log(document.contains(clickedElement))
+          if (clickedElement) {
+            $('#clicked').click()
+          }
+          $('#clicked').removeAttr('id')
+          return true
+        } else {
+          return false
+        }
+      }
+
+      var onSelect = function(e) {
+        console.log('selecting')
+        var selectionOpenLength = "<div class='selection'>".length
+        var selection = this.getSelection()
+        console.log(selection.anchorNode)
+
+        if (!selection.isCollapsed) {
+          var anchorNode = selection.anchorNode
+          var anchorOffset = selection.anchorOffset
+          var focusNode = selection.focusNode
+          var focusOffset = selection.focusOffset
+          console.log(focusNode)
+          console.log(focusOffset)
+          var startIndex = getIndexFromSelection(anchorNode, anchorOffset)
+          var endIndex = getIndexFromSelection(focusNode, focusOffset)
+          if (startIndex > endIndex) {
+            var tmp;
+            tmp = startIndex
+            startIndex = endIndex
+            endIndex = tmp
+          }
+
+          var oldHtml = $('#content').html()
+          console.log(startIndex)
+          console.log(endIndex)
+          console.log(oldHtml)
+
+          // selections with a br aren't turned into links
+          if (oldHtml.slice(startIndex, endIndex).indexOf('<br>') == -1) {
+            // don't stop at space if within bracket
+            var withinBracket = false
+            // usually has to check the char before startIndex
+            while (startIndex - 1 >= 0 &&  //simple. makes sure startIndex can't go below 0
+                     !(oldHtml[startIndex - 1] == ' ' && !withinBracket) &&//stop at a space if not within bracket
+                     oldHtml.slice(startIndex - 4, startIndex) !== '<br>') { // stops at a br
+              startIndex -= 1
+              if (oldHtml[startIndex] == '>') {
+                withinBracket = true
+              }
+              if (oldHtml[startIndex] == '<') {
+                withinBracket = false
+              }
+            }
+
+            withinBracket = false
+            // whereas this one usually checks the char at endIndex
+            while (endIndex + 1 < oldHtml.length && //can't go past the length of the document
+                     !(oldHtml[endIndex] == ' ' && !withinBracket) &&//stop at a space
+                     oldHtml.slice(endIndex, endIndex + 4) !== '<br>') { // stops at a br
+              if (oldHtml[endIndex] == '<') {
+                withinBracket = true
+              }
+              if (oldHtml[endIndex] == '>') {
+                withinBracket = false
+              }
+              endIndex += 1
+            }
+
+            console.log(startIndex)
+            console.log(endIndex)
+
+            if ($('.selection').length) {
+              var selectionHtml = $('.selection').wrap('<div>').parent().html()
+              $('.selection').unwrap()
+              var oldStartIndex = oldHtml.indexOf(selectionHtml)
+              var oldEndIndex = oldStartIndex + selectionHtml.length
+              var currentStartIndex = startIndex
+              var currentEndIndex = endIndex
+              if (oldStartIndex < currentStartIndex) {
+                startIndex -= selectionOpenLength
+              }
+              if (oldEndIndex < currentStartIndex) {
+                startIndex -= "</div>".length
+              }
+              if (oldStartIndex < currentEndIndex) {
+                endIndex -= selectionOpenLength
+              }
+              if (oldEndIndex < currentEndIndex) {
+                endIndex -= "</div>".length
+              }
+              oldHtml = oldHtml.replace(selectionHtml, selectionHtml.slice(selectionOpenLength, selectionHtml.length-6))
+            }
+            oldHtml = oldHtml.slice(0, startIndex) + "<div class='selection'>" + oldHtml.slice(startIndex)
+            oldHtml = oldHtml.slice(0, endIndex + selectionOpenLength) + "</div>" + oldHtml.slice(endIndex + selectionOpenLength)
+            var innerHtml = oldHtml.slice(startIndex + selectionOpenLength, endIndex + selectionOpenLength)
+            $('#content').html(oldHtml)
+            selectElementContents($('.selection')[0])
+            $('.selection').on('mousedown', function() {
+              window.location = "{{ url_for('index_view') }}?key=" + encodeURIComponent($(this).text())
+            })
+            $('.click').click(linkClick) // reseting html removes click handlers
+          }
+        } else {
+          var position = getCurrentCursorPosition('content')
+          console.log('deselect')
+          var clickedElement
+          if (selection.isCollapsed && $(selection.focusNode.parentNode).hasClass('click')) {
+            clickedElement = selection.focusNode.parentNode
+          }
+          console.log(clickedElement)
+          if (clearSelection(clickedElement)) {
+            setCurrentCursorPosition(position, 'content')
+          }
+        }
+      }
+
+      // set seletion functions
+      $(document).on('mouseup', onSelect);
+      $(document).on('keyup', onSelect);
+
+
+      $(document).click(function(e) {
+        var added = false
+        while ($('#content').height() < e.pageY) {
+          added = true
+          $('#content').html($('#content').html() + "<br/>")
+          $('.click').click(linkClick) // reseting html removes click handlers
+        }
+        if (added) {
+          placeCaretAtEnd(document.getElementById("content"))
+        }
+      })
+
+      var pendingRequests = -1
+     
+      $('#content').on('input', function(e) {
+        body = $(this).html()
+          .replace(/&nbsp;(?!<)/ig, ' ')
+          .replace(/ style="(.)+?"/ig, '')
+          .replace(/ class="(.)+?"/ig, '')
+          .replace(/\n/ig, '')
+          .replace(/<br>/ig, '\n')
+          .replace(/<(\w)+?>/ig, '')
+          .replace(/<\/div>/ig, '')
+          .replace(/<\/(\w)+?>/ig, '\n')
+          .replace(/<img src="/ig, '')
+          .replace(/" title="" style="">/ig, '')
+          .replace(/">/ig, '')
+          .replace(/<span /ig, '')
+        waiting = true
+        pendingRequests += 1
+        $.post("{{ url_for('index_post') }}", {body: body, key: pageKey}, function(data) {
+          if (data.success) {
+            console.log('saved')
+          }
+        });
+      });
+
+			socket.on('disconnect', function(data) {
+				console.log('Websocket was disconnected: ' + JSON.stringify(data));
+			})
+
+			// receive a message though the websocket from the server
+      socket.on('{{ key }}' , function(data) {
+        if (firstMessage) {
+          firstMessage = false;
+          return
+        }
+        pendingRequests -= 1
+        console.log(pendingRequests)
+        if (!pendingRequests) {
+          console.log('setting')
+          var position = getCurrentCursorPosition('content')
+          $('#content').html(data.body)
+          setCurrentCursorPosition(position, 'content')
+
+          $('.click').click(linkClick) // reseting html removes click handlers
+        }
+			})
+
+      function linkClick(e) {
+        console.log('clicked!')
+        var node = this
+        var index = 0
+        while (node.previousSibling && node.previousSibling.nodeName !== 'BR') {
+          var node_contents = $(node).text()
+          index += node_contents.length
+          node = node.previousSibling
+        }
+        var node_contents = $(node).text()
+        index += node_contents.length
+        index = index - 1
+
+        var sentence = ''
+        while (node && node.nodeName !== 'BR') {
+          sentence += $(node).text()
+          node = node.nextSibling
+        }
+        $.post("{{ url_for('link_post') }}", {text: sentence, index: index}, function(data) {
+          window.location = "{{ url_for('index_view') }}?key=" + encodeURIComponent(data['term'])
+        });
+      }
+
+      $('.click').click(linkClick)
+      setCurrentCursorPosition(0, 'content')
+		});
+  </script>
+  {% endif %}
+</head>
+
+<body>
+  <div id="content"{% if not readonly %} contenteditable="true"{% endif %}>{{body|safe}}</div>
+</body>
+</html>
