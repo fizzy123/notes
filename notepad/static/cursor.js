@@ -73,7 +73,7 @@ function getCurrentCursorPosition(parentId) {
               node = node.childNodes[charCount]
               charCount = 1
               // two brs right next to one another has weird behvaiors
-              if (node.previousSibling.nodeName == 'BR') {
+              if (node.previousSibling && node.previousSibling.nodeName == 'BR') {
                 charCount = 0
               }
             }

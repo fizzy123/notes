@@ -17,5 +17,18 @@ class Note(db.Model):
             'body': self.body
         }
 
-    def __repr(self):
+# convinience function to account for note history being saved
+    @staticmethod
+    def write(key, body):
+        note = Note(key=key, body=body)
+        db.session.add(note)
+
+        notes = Note.query.filter(Note.key == key).order_by(Note.id.desc()).all()
+        for note in notes[10:]:
+            db.session.delete(note)
+        db.session.commit()
+        return note
+
+
+    def __repr__(self):
         return '<Note %r>' % self.key

@@ -1,12 +1,13 @@
 import re
 import urllib
 import logging
+from textwrap import TextWrapper
 
 from sqlalchemy import and_
 from sqlalchemy.sql.expression import bindparam, func
-from flask import render_template, request, jsonify
+from flask import render_template, request, jsonify, session
 
-from notepad import app, db, socketio
+from notepad import app, db, socketio, csrf, settings
 from notepad.models import Note
 
 logger = logging.getLogger(__name__)
@@ -22,58 +23,111 @@ def index_view():
     if not content:
         content = '<br>'
     readonly = '#readonly' in content
+    if not session.get('loggedin'):
+        readonly = True
+    if key == 'login':
+        readonly = False
     return render_template('index.html', body=content, key=key, readonly=readonly)
 
 @app.route('/', methods=['POST'])
+@csrf.exempt
 def index_post():
     body = request.form.get('body')
     key = request.form.get('key').lower()
 
     if not key:
         key = 'root'
+    if key == 'login':
+        if body.strip() == settings.password:
+            session['loggedin'] = True
+            return jsonify({'success': True})
+        return jsonify({'success': False})
 
-    note = Note(key=key, body=body)
-    db.session.add(note)
-    db.session.commit()
-
-    notes = Note.query.filter(Note.key == key).order_by(Note.id.desc()).all()
-    for note in notes[10:]:
-        db.session.delete(note)
-    db.session.commit()
+    Note.write(key, body)
 
     content = clientEncodeContent(body)
     socketio.emit(key, {'body': content})
     return jsonify({'success': True})
 
-def clientEncodeContent(body):
-    if not body:
-        body = ''
+@app.route('/search', methods=['GET'])
+def search_view():
+    term = urllib.parse.unquote_plus(request.args['term']).lower()
+    notes = db.session.query(Note.key).group_by(Note.key).filter(Note.key.contains(term)).limit(10).all()
+    notes = [note.key for note in notes]
+    return jsonify({'results': notes})
 
+def find_notes(body):
     subq = db.session.query(func.max(Note.id).label("max_id")).group_by(Note.key).subquery()
     notes = Note.query.join(subq, and_(Note.id == subq.c.max_id)) \
                       .filter(bindparam('body', body).contains(Note.key)) \
-                      .order_by(func.length(Note.body).desc()) \
+                      .filter(Note.key != "") \
+                      .order_by(func.length(Note.key).desc()) \
                       .all()
+    return notes
 
+def clientEncodeContent(body, wrap=False):
+    if not body:
+        body = ''
+
+    notes = find_notes(body)
+
+    replace_dict = {}
+    replace_index = 0
     for note in notes:
         if note.key:
-            key_words = note.key.split(' ')
-#pylint: disable=line-too-long
-            formatted_key_words = ['<div class="click">{}</div>'.format(word) for word in key_words]
-            body = re.sub(r"([^>]??)" + re.escape(note.key) + r"([^<]??)", r"\1" + ' '.join(formatted_key_words) + r"\2", body)
+            body = re.sub(r"(^| |\n)" +re.escape(note.key) + r"($| |,|\.|\?|!|\n)", r"\1#REPLACE_ME{}#\2".format(replace_index), body, flags=re.I)
+            replace_dict[replace_index] = note
+            replace_index = replace_index + 1
+    if wrap:
+        wrapper = TextWrapper(width=70)
+        paragraphs = body.split('\n')
+        new_paragraphs = []
+        for paragraph in paragraphs:
+            new_paragraphs.append(wrapper.fill(paragraph))
+        body = '\n'.join(new_paragraphs)
+
+    for key, note in replace_dict.items():
+        body = body.replace('#REPLACE_ME{}#'.format(key),
+                            '<div class="click">{}</div>'.format(note.key))
+
     body = re.sub(r"(https?:.*\.(jpg|png|gif))", r'<img src="\1">', body)
     body = body.replace('\n', '<br>')
     return body
 
-@app.route('/link', methods=['POST'])
-def link_post():
-    text = request.form.get('text')
-    index = int(request.form.get('index'))
-    notes = Note.query.filter(bindparam('body', text).contains(Note.key)) \
-                      .order_by(func.length(Note.body).desc()) \
-                      .all()
-    for note in notes:
-        for m in re.finditer(note.key, text, re.IGNORECASE):
-            if m.start() < index and m.end() > index:
-                return jsonify({"term": note.key})
-    return jsonify({"term":""})
+@app.route('/bigpicture')
+def bigpicture_index():
+    return render_template('bigpicture.html')
+
+
+@app.route('/infinite')
+def infinite_index():
+    return render_template('infinite.html')
+
+@app.route('/get_children', methods=['POST'])
+def get_children_post():
+    # fill anchor
+    data = request.get_json()
+    anchor = None
+    if not data.get('pks'):
+        anchor = Note.query.filter(Note.key == 'nobel yoo') \
+                           .order_by(Note.id.desc()) \
+                           .first() \
+                           .dictify()
+        anchor['children'] = {note.key: note.id for note in find_notes(anchor['body'])}
+        anchor['body'] = clientEncodeContent(anchor['body'], wrap=True)
+
+    if data.get('anchor'):
+        anchor = Note.query.get(data.get('anchor')).dictify()
+        anchor['children'] = {note.key: note.id for note in find_notes(anchor['body'])}
+        anchor['body'] = clientEncodeContent(anchor['body'], wrap=True)
+
+    # populate nodes
+    nodes_dict = {}
+    if data.get('pks'):
+        notes = Note.query.filter(Note.id.in_(data['pks'].keys())).all()
+        for note in notes:
+            nodes_dict[note.id] = note.dictify()
+            nodes_dict[note.id]['body'] = clientEncodeContent(note.body, wrap=True)
+            nodes_dict[note.id]['children'] = {child.key: child.id for child in find_notes(note.body)}
+            nodes_dict[note.id]['parent'] = data['pks'][str(note.id)]
+    return jsonify({'nodes': nodes_dict, 'anchor': anchor})

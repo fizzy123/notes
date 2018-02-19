@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.config.from_object(settings)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 socketio = SocketIO(app)
-CSRFProtect(app)
+csrf = CSRFProtect(app)
 db = SQLAlchemy(app)
 
 #pylint: disable=wrong-import-position

@@ -1,10 +1,12 @@
 body {
   margin: 0px;
-  text-align: left;
+  text-align: center;
+  font-family: "Quicksand", sans-serif;
 }
 
 #content {
   width: 100%;
+  text-align: left;
 }
 
 *:focus {
@@ -23,4 +25,26 @@ div {
   cursor: pointer;
 }
 
+.header {
+  font-size: 72px;
+  text-align: center;
+  color: #0B486B;
+}
 
+.container {
+  width: 800px;
+}
+
+.title {
+  display: inline-block;
+  font-size: 32px;
+}
+
+.ui-widget {
+  display:block;
+  width:200px;
+}
+
+.ui-autocomplete {
+  text-align:left;
+}

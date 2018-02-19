@@ -6,11 +6,16 @@
   <link href="{{ url_for('static', filename='index.css') }}" rel="stylesheet">
   <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
   <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-  <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
-  <script type="text/javascript" src="{{ url_for('static', filename='cursor.js') }}"></script>
-  {% if not readonly %}
+  <link href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" rel='stylesheet'>
+
+    <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+<style>
+    @import url('https://fonts.googleapis.com/css?family=Quicksand')
+    </style>
+    <script type="text/javascript" src="{{ url_for('static', filename='cursor.js') }}"></script>
   <script type="text/javascript">
     var csrftoken = "{{ csrf_token() }}";
+    var readonly = "{{ readonly }}" == "True";
     function csrfSafeMethod(method) {
       // these HTTP methods do not require CSRF protection
       return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
@@ -23,12 +28,35 @@
       }
     });
 
-
     var pageKey = '{{key}}'
     var firstMessage = true;
     var divCloseLength = "</div>".length
 
 		jQuery(document).ready(function($) {
+      // enable search
+      $('#search').autocomplete({
+        source: function(request, response) {
+          $.get({
+            url: "{{ url_for('search_view') }}?term=" + encodeURIComponent(request.term),
+            success: function(data) {
+              resultCount = data.results.length
+              response(data.results)
+            }
+          })
+        },
+        select: function(event, ui) {
+            window.location = "{{ url_for('index_view') }}?key=" + encodeURIComponent(ui.item.value)
+        },
+        autoFocus: true
+      });
+      var resultCount = 0
+      $('#search').keyup(function(e) {
+        var code = e.keyCode || e.which;
+        if (resultCount === 0 && code === 13) {
+          window.location = "{{ url_for('index_view') }}?key=" + encodeURIComponent($('#search').val())
+        }
+      });
+
       var socket = io.connect();
 
       // disable select all
@@ -96,8 +124,8 @@
           var removedHtml = $('#content').html().replace(selectionHtml, selectionHtml.slice(selectionOpenLength, selectionHtml.length-6))
           $('#content').html(removedHtml)
           $('.click').click(linkClick) // reseting html removes click handlers
+          $('.click').each(linkColor) // reseting colors
           // click handler doesn't trigger for some reason so I'll trigger it manually
-          console.log(document.contains(clickedElement))
           if (clickedElement) {
             $('#clicked').click()
           }
@@ -109,18 +137,14 @@
       }
 
       var onSelect = function(e) {
-        console.log('selecting')
         var selectionOpenLength = "<div class='selection'>".length
         var selection = this.getSelection()
-        console.log(selection.anchorNode)
 
         if (!selection.isCollapsed) {
           var anchorNode = selection.anchorNode
           var anchorOffset = selection.anchorOffset
           var focusNode = selection.focusNode
           var focusOffset = selection.focusOffset
-          console.log(focusNode)
-          console.log(focusOffset)
           var startIndex = getIndexFromSelection(anchorNode, anchorOffset)
           var endIndex = getIndexFromSelection(focusNode, focusOffset)
           if (startIndex > endIndex) {
@@ -131,9 +155,6 @@
           }
 
           var oldHtml = $('#content').html()
-          console.log(startIndex)
-          console.log(endIndex)
-          console.log(oldHtml)
 
           // selections with a br aren't turned into links
           if (oldHtml.slice(startIndex, endIndex).indexOf('<br>') == -1) {
@@ -166,8 +187,6 @@
               endIndex += 1
             }
 
-            console.log(startIndex)
-            console.log(endIndex)
 
             if ($('.selection').length) {
               var selectionHtml = $('.selection').wrap('<div>').parent().html()
@@ -199,35 +218,32 @@
               window.location = "{{ url_for('index_view') }}?key=" + encodeURIComponent($(this).text())
             })
             $('.click').click(linkClick) // reseting html removes click handlers
+            $('.click').each(linkColor)
           }
         } else {
           var position = getCurrentCursorPosition('content')
-          console.log('deselect')
           var clickedElement
           if (selection.isCollapsed && $(selection.focusNode.parentNode).hasClass('click')) {
             clickedElement = selection.focusNode.parentNode
           }
-          console.log(clickedElement)
           if (clearSelection(clickedElement)) {
             setCurrentCursorPosition(position, 'content')
           }
         }
       }
 
-      // set seletion functions
-      $(document).on('mouseup', onSelect);
-      $(document).on('keyup', onSelect);
+      if (!readonly) {
+        // set seletion functions
+        $(document).on('mouseup', onSelect);
+        $(document).on('keyup', onSelect);
+      }
 
 
       $(document).click(function(e) {
-        var added = false
         while ($('#content').height() < e.pageY) {
-          added = true
           $('#content').html($('#content').html() + "<br/>")
           $('.click').click(linkClick) // reseting html removes click handlers
-        }
-        if (added) {
-          placeCaretAtEnd(document.getElementById("content"))
+          $('.click').each(linkColor)
         }
       })
 
@@ -250,6 +266,9 @@
         waiting = true
         pendingRequests += 1
         $.post("{{ url_for('index_post') }}", {body: body, key: pageKey}, function(data) {
+          if (pageKey === 'login' && data.success) {
+            window.location = '/'
+          }
           if (data.success) {
             console.log('saved')
           }
@@ -266,49 +285,63 @@
           firstMessage = false;
           return
         }
-        pendingRequests -= 1
         console.log(pendingRequests)
+        pendingRequests -= 1
+        if (pendingRequests < 0) {
+          pendingRequests = 0
+        }
         if (!pendingRequests) {
-          console.log('setting')
           var position = getCurrentCursorPosition('content')
+          console.log(position)
           $('#content').html(data.body)
           setCurrentCursorPosition(position, 'content')
 
           $('.click').click(linkClick) // reseting html removes click handlers
+          $('.click').each(linkColor)
         }
 			})
 
       function linkClick(e) {
         console.log('clicked!')
-        var node = this
-        var index = 0
-        while (node.previousSibling && node.previousSibling.nodeName !== 'BR') {
-          var node_contents = $(node).text()
-          index += node_contents.length
-          node = node.previousSibling
-        }
-        var node_contents = $(node).text()
-        index += node_contents.length
-        index = index - 1
-
-        var sentence = ''
-        while (node && node.nodeName !== 'BR') {
-          sentence += $(node).text()
-          node = node.nextSibling
-        }
-        $.post("{{ url_for('link_post') }}", {text: sentence, index: index}, function(data) {
-          window.location = "{{ url_for('index_view') }}?key=" + encodeURIComponent(data['term'])
-        });
+        window.location = "{{ url_for('index_view') }}?key=" + encodeURIComponent($(this).text())
       }
 
       $('.click').click(linkClick)
+
+      var colors = [
+         '#00A0B0',
+         '#6A4A3C',
+         '#CC333F',
+         '#EB6841',
+         '#EDC951'
+      ];
+
+      function linkColor() {
+        var color = colors[Math.floor(Math.random() * colors.length)]
+        $(this).css('color', color)
+      }
+
+      $('.click').each(linkColor)
+
       setCurrentCursorPosition(0, 'content')
 		});
   </script>
-  {% endif %}
 </head>
 
 <body>
-  <div id="content"{% if not readonly %} contenteditable="true"{% endif %}>{{body|safe}}</div>
+  <div class='ui-widget'>
+    <input id='search' style='width:100%;box-sizing:border-box;'>
+  </div>
+  <div class="container">
+
+  <a href="/">
+  <div class="header">Nobel Yoo</div>
+  </a>
+    <div style="width:100%">
+      <div class="title">{{key}}</div>
+
+    </div>
+    <div id="content"{% if not readonly %} contenteditable="true"{% endif %}>{{body|safe}}</div>
+  </div>
 </body>
 </html>
