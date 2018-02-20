@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 @app.route('/', methods=['GET'])
 def index_view():
-    key = urllib.parse.unquote_plus(request.args.get('key', 'root')).lower()
+    key = urllib.parse.unquote_plus(request.args.get('key', 'home')).lower()
     note = Note.query.filter(Note.key == key).order_by(Note.id.desc()).first()
     content = None
     if note:
@@ -36,7 +36,7 @@ def index_post():
     key = request.form.get('key').lower()
 
     if not key:
-        key = 'root'
+        key = 'home'
     if key == 'login':
         if body.strip() == settings.password:
             session['loggedin'] = True
@@ -93,41 +93,3 @@ def clientEncodeContent(body, wrap=False):
     body = re.sub(r"(https?:.*\.(jpg|png|gif))", r'<img src="\1">', body)
     body = body.replace('\n', '<br>')
     return body
-
-@app.route('/bigpicture')
-def bigpicture_index():
-    return render_template('bigpicture.html')
-
-
-@app.route('/infinite')
-def infinite_index():
-    return render_template('infinite.html')
-
-@app.route('/get_children', methods=['POST'])
-def get_children_post():
-    # fill anchor
-    data = request.get_json()
-    anchor = None
-    if not data.get('pks'):
-        anchor = Note.query.filter(Note.key == 'nobel yoo') \
-                           .order_by(Note.id.desc()) \
-                           .first() \
-                           .dictify()
-        anchor['children'] = {note.key: note.id for note in find_notes(anchor['body'])}
-        anchor['body'] = clientEncodeContent(anchor['body'], wrap=True)
-
-    if data.get('anchor'):
-        anchor = Note.query.get(data.get('anchor')).dictify()
-        anchor['children'] = {note.key: note.id for note in find_notes(anchor['body'])}
-        anchor['body'] = clientEncodeContent(anchor['body'], wrap=True)
-
-    # populate nodes
-    nodes_dict = {}
-    if data.get('pks'):
-        notes = Note.query.filter(Note.id.in_(data['pks'].keys())).all()
-        for note in notes:
-            nodes_dict[note.id] = note.dictify()
-            nodes_dict[note.id]['body'] = clientEncodeContent(note.body, wrap=True)
-            nodes_dict[note.id]['children'] = {child.key: child.id for child in find_notes(note.body)}
-            nodes_dict[note.id]['parent'] = data['pks'][str(note.id)]
-    return jsonify({'nodes': nodes_dict, 'anchor': anchor})
