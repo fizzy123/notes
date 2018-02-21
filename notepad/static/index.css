@@ -48,3 +48,7 @@ div {
 .ui-autocomplete {
   text-align:left;
 }
+
+a {
+  cursor: pointer;
+}

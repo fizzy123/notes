@@ -123,8 +123,7 @@
           $(clickedElement).attr('id', 'clicked')
           var removedHtml = $('#content').html().replace(selectionHtml, selectionHtml.slice(selectionOpenLength, selectionHtml.length-6))
           $('#content').html(removedHtml)
-          $('.click').click(linkClick) // reseting html removes click handlers
-          $('.click').each(linkColor) // reseting colors
+          reload()
           // click handler doesn't trigger for some reason so I'll trigger it manually
           if (clickedElement) {
             $('#clicked').click()
@@ -217,8 +216,7 @@
             $('.selection').on('mousedown', function() {
               window.location = "{{ url_for('index_view') }}?key=" + encodeURIComponent($(this).text())
             })
-            $('.click').click(linkClick) // reseting html removes click handlers
-            $('.click').each(linkColor)
+            reload()
           }
         } else {
           var position = getCurrentCursorPosition('content')
@@ -242,24 +240,25 @@
       $(document).click(function(e) {
         while ($('#content').height() < e.pageY) {
           $('#content').html($('#content').html() + "<br/>")
-          $('.click').click(linkClick) // reseting html removes click handlers
-          $('.click').each(linkColor)
+          reload()
         }
       })
 
       var pendingRequests = -1
      
       $('#content').on('input', function(e) {
+        console.log($(this).html())
         body = $(this).html()
           .replace(/&nbsp;(?!<)/ig, ' ')
           .replace(/ style="(.)+?"/ig, '')
           .replace(/ class="(.)+?"/ig, '')
+          .replace(/ href="(.)+?"/ig, '') // removeLinks
           .replace(/\n/ig, '')
           .replace(/<br>/ig, '\n')
           .replace(/<(\w)+?>/ig, '')
           .replace(/<\/div>/ig, '')
           .replace(/<\/(\w)+?>/ig, '\n')
-          .replace(/<img src="/ig, '')
+          .replace(/<img src="/ig, '') // remove images
           .replace(/" title="" style="">/ig, '')
           .replace(/">/ig, '')
           .replace(/<span /ig, '')
@@ -268,9 +267,6 @@
         $.post("{{ url_for('index_post') }}", {body: body, key: pageKey}, function(data) {
           if (pageKey === 'login' && data.success) {
             window.location = '/'
-          }
-          if (data.success) {
-            console.log('saved')
           }
         });
       });
@@ -285,7 +281,6 @@
           firstMessage = false;
           return
         }
-        console.log(pendingRequests)
         pendingRequests -= 1
         if (pendingRequests < 0) {
           pendingRequests = 0
@@ -296,8 +291,7 @@
           $('#content').html(data.body)
           setCurrentCursorPosition(position, 'content')
 
-          $('.click').click(linkClick) // reseting html removes click handlers
-          $('.click').each(linkColor)
+          reload()
         }
 			})
 
@@ -305,8 +299,6 @@
         console.log('clicked!')
         window.location = "{{ url_for('index_view') }}?key=" + encodeURIComponent($(this).text())
       }
-
-      $('.click').click(linkClick)
 
       var colors = [
          '#00A0B0',
@@ -321,7 +313,18 @@
         $(this).css('color', color)
       }
 
-      $('.click').each(linkColor)
+      function anchorClick(e) {
+        window.location = $(this).attr('href')
+      }
+
+
+      reload()
+
+      function reload() {
+        $('.click').each(linkColor)
+        $('.click').click(linkClick)
+        $('a').click(anchorClick)
+      }
 
       setCurrentCursorPosition(0, 'content')
 		});
@@ -335,7 +338,7 @@
   <div class="container">
 
   <a href="/">
-  <div class="header">Syzygy Academy Wiki</div>
+    <div class="header">Syzygy Academy Wiki</div>
   </a>
     <div style="width:100%">
       <div class="title">{{key}}</div>

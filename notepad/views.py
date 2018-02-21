@@ -90,6 +90,7 @@ def clientEncodeContent(body, wrap=False):
         body = body.replace('#REPLACE_ME{}#'.format(key),
                             '<div class="click">{}</div>'.format(note.key))
 
-    body = re.sub(r"(https?:.*\.(jpg|png|gif))", r'<img src="\1">', body)
+    body = re.sub(r"(https?://.*\.(jpg|png|gif))", r'<img src="\1">', body)
+    body = re.sub(r"(https?://.*)($| |\n)", r'<a href="\1">\1</a>', body)
     body = body.replace('\n', '<br>')
     return body
