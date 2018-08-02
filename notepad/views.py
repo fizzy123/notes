@@ -5,12 +5,16 @@ from textwrap import TextWrapper
 
 from sqlalchemy import and_
 from sqlalchemy.sql.expression import bindparam, func
-from flask import render_template, request, jsonify, session, redirect
+from flask import render_template, request, jsonify, session, redirect, url_for
 
 from notepad import app, db, socketio, csrf, settings
 from notepad.models import Note
 
 logger = logging.getLogger(__name__)
+
+@app.route('/hire-me', methods=['GET'])
+def hire_me_view():
+    return redirect(url_for('index_view', key='hire me'))
 
 @app.route('/', methods=['GET'])
 def index_view():
@@ -22,8 +26,8 @@ def index_view():
 
     if note:
         redirectTag = "redirect="
-        if note.body[:len(redirectTag)] == redirectTag:
-            return redirect(note.body.replace(redirectTag, ""))
+        if note.body[:len(redirectTag)] == redirectTag and not request.args.get('disable-redirect', False):
+            return redirect(note.body.replace(redirectTag, "").strip())
         content = clientEncodeContent(note.body)
 
     if not content:
