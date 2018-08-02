@@ -101,7 +101,7 @@ function getCurrentCursorPosition(parentId) {
     }
 
     return charCount;
-};
+}
 
 function selectElementContents(el) {
     var range = document.createRange();
