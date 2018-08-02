@@ -5,7 +5,7 @@ from textwrap import TextWrapper
 
 from sqlalchemy import and_
 from sqlalchemy.sql.expression import bindparam, func
-from flask import render_template, request, jsonify, session
+from flask import render_template, request, jsonify, session, redirect
 
 from notepad import app, db, socketio, csrf, settings
 from notepad.models import Note
@@ -19,7 +19,11 @@ def index_view():
     if request.args.get('json', False):
         return jsonify({'body':note.body})
     content = None
+
     if note:
+        redirectTag = "redirect="
+        if note.body[:len(redirectTag)] == redirectTag:
+            return redirect(note.body.replace(redirectTag, ""))
         content = clientEncodeContent(note.body)
 
     if not content:
@@ -96,8 +100,6 @@ def clientEncodeContent(body, wrap=False):
 
     #we can't just do a simple substitution after the first one because image urls also match links.
     for match in re.finditer(r"(https?://[a-zA-Z0-9/:\.?=]*)($| |\n)", body):
-        logger.error(match.group())
-        logger.error("\n")
         if match.start() - 1 <= 0 and match.end() + 1 < len(body): # check to make sure it's not out of bounds
             if body[match.start() - 1] == '"' and body[match.end() + 1] == '"': # check to see whether it's already in some kind of element
                 continue
