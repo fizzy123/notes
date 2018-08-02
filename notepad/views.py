@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 @app.route('/', methods=['GET'])
 def index_view():
-    key = urllib.parse.unquote_plus(request.args.get('key', 'home')).lower()
+    key = urllib.parse.unquote_plus(request.args.get('key', 'root')).lower()
     note = Note.query.filter(Note.key == key).order_by(Note.id.desc()).first()
     if request.args.get('json', False):
         return jsonify({'body':note.body})
@@ -93,6 +93,14 @@ def clientEncodeContent(body, wrap=False):
                             '<div class="click">{}</div>'.format(note.key))
 
     body = re.sub(r"(https?://.*\.(jpg|png|gif))($| |\n)", r'<img src="\1">', body)
-    body = re.sub(r"(https?://.*)($| |\n)[^\"]", r'<a href="\1">\1</a>', body)
+
+    #we can't just do a simple substitution after the first one because image urls also match links.
+    for match in re.finditer(r"(https?://[a-zA-Z0-9/:\.?=]*)($| |\n)", body):
+        logger.error(match.group())
+        logger.error("\n")
+        if match.start() - 1 <= 0 and match.end() + 1 < len(body): # check to make sure it's not out of bounds
+            if body[match.start() - 1] == '"' and body[match.end() + 1] == '"': # check to see whether it's already in some kind of element
+                continue
+        body = body.replace(match.group(), '<a href="{0}">{0}</a>'.format(match.group(1)))
     body = body.replace('\n', '<br>')
     return body
