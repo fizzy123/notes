@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 def index_view():
     key = urllib.parse.unquote_plus(request.args.get('key', 'home')).lower()
     note = Note.query.filter(Note.key == key).order_by(Note.id.desc()).first()
+    if request.args.get('json', False):
+        return jsonify({'body':note.body})
     content = None
     if note:
         content = clientEncodeContent(note.body)
@@ -90,7 +92,7 @@ def clientEncodeContent(body, wrap=False):
         body = body.replace('#REPLACE_ME{}#'.format(key),
                             '<div class="click">{}</div>'.format(note.key))
 
-    body = re.sub(r"(https?://.*\.(jpg|png|gif))", r'<img src="\1">', body)
-    body = re.sub(r"(https?://.*)($| |\n)", r'<a href="\1">\1</a>', body)
+    body = re.sub(r"(https?://.*\.(jpg|png|gif))($| |\n)", r'<img src="\1">', body)
+    body = re.sub(r"[^\"](https?://.*)($| |\n)[^\"]", r'<a href="\1">\1</a>', body)
     body = body.replace('\n', '<br>')
     return body

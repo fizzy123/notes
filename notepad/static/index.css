@@ -1,7 +1,7 @@
 body {
   margin: 0px;
   text-align: center;
-  font-family: "Quicksand", sans-serif;
+  font-family: "Inconsolata$", monospace;
 }
 
 #content {
@@ -29,6 +29,7 @@ div {
   font-size: 72px;
   text-align: center;
   color: #0B486B;
+  font-family: "Quicksand", sans-serif;
 }
 
 .container {

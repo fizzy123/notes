@@ -1,3 +1,4 @@
 env
 notepad/settings.py
 *.pyc
+access_token

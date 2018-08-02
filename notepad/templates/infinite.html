@@ -1,0 +1,48 @@
+<!--
+ *
+ * bigpicture.js
+ *
+ * bigpicture.js is a library that allows infinite panning and infinite zooming in HTML pages.
+ *               See it in action on http://www.bigpicture.bi/demo !
+ * 
+ * author:  Joseph Ernest (twitter: @JosephErnest)
+ * url:     http://github.com/josephernest/bigpicture.js
+ *
+ * -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>bigpicture.js</title>
+  <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='js.cookie.js') }}"></script>
+  <script type="text/javascript">
+    var csrftoken = "{{ csrf_token() }}";
+    function csrfSafeMethod(method) {
+      // these HTTP methods do not require CSRF protection
+      return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+    }
+    $.ajaxSetup({
+      beforeSend: function(xhr, settings) {
+        if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+          xhr.setRequestHeader("X-CSRFToken", csrftoken);
+        }
+      }
+    });
+  </script>
+  <script src="https://code.createjs.com/createjs-2015.11.26.min.js"></script>
+  <script src="https://code.createjs.com/easeljs-0.8.2.min.js"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='glitch-canvas.min.js') }}"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='infinite.js') }}"></script>
+  <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='bigpicture.css') }}" rel="stylesheet">
+  <style>
+  body, html { margin: 0; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+</body>
+</html>
