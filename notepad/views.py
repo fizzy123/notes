@@ -1,6 +1,8 @@
 import re
 import urllib
 import logging
+import json
+import random
 from textwrap import TextWrapper
 
 from sqlalchemy import and_
@@ -26,7 +28,8 @@ def index_view():
 
     if note:
         redirectTag = "redirect="
-        if note.body[:len(redirectTag)] == redirectTag and not request.args.get('disable-redirect', False):
+        if note.body[:len(redirectTag)] == redirectTag and \
+           not request.args.get('disable-redirect', False):
             return redirect(note.body.replace(redirectTag, "").strip())
         content = clientEncodeContent(note.body)
 
@@ -62,9 +65,31 @@ def index_post():
 @app.route('/search', methods=['GET'])
 def search_view():
     term = urllib.parse.unquote_plus(request.args['term']).lower()
-    notes = db.session.query(Note.key).group_by(Note.key).filter(Note.key.contains(term)).limit(10).all()
+    notes = db.session.query(Note.key) \
+                      .group_by(Note.key) \
+                      .filter(Note.key.contains(term)) \
+                      .limit(10) \
+                      .all()
     notes = [note.key for note in notes]
     return jsonify({'results': notes})
+
+@app.route("/combinations", methods=['GET'])
+def combinations_view():
+    key = urllib.parse.unquote_plus(request.args.get('key', 'root')).lower()
+    note = Note.query.filter(Note.key == key).order_by(Note.id.desc()).first()
+    try:
+        options = json.loads(note.body)
+        adjectives = []
+        while random.random() < 0.93**len(adjectives):
+            index = random.randrange(len(options))
+            choice = random.choice(options[index]['items'])
+            if choice:
+                adjectives.append(choice)
+            if not options[index]['repeat']:
+                options = options[:index] + options[index+1:]
+        return render_template("combinations.html", adjectives=adjectives, key=key)
+    except json.JSONDecodeError as err:
+        return render_template('combinations.html', err=err, key=key)
 
 def find_notes(body):
     subq = db.session.query(func.max(Note.id).label("max_id")).group_by(Note.key).subquery()
