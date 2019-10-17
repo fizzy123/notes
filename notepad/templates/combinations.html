@@ -1,0 +1,15 @@
+<html
+  <body>
+    {% if err %}
+      {{ err }}
+    {% else %}
+      <ul>
+      {% for adjective in adjectives %}
+        <li>
+          {{ adjective }}
+        </li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+  </body>
+</html>
