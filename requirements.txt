@@ -9,7 +9,7 @@ dill==0.2.7.1
 en-core-web-sm==2.0.0
 enum-compat==0.0.2
 eventlet==0.21.0
-Flask==0.12.2
+Flask==1.0
 Flask-Migrate==2.1.1
 Flask-Script==2.0.6
 Flask-SocketIO==2.9.2
