@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8">
   <title>{{key}}</title>
-  <link href="{{ url_for('static', filename='index.css') }}" rel="stylesheet">
   <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
   <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
   <link href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" rel='stylesheet'>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Trumbowyg/2.19.1/trumbowyg.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Trumbowyg/2.19.1/ui/trumbowyg.min.css">
+  <link href="{{ url_for('static', filename='index.css') }}" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css?family=Inconsolata|Quicksand');
 </style>
@@ -37,6 +38,15 @@
     var selectionText = ""
 
 		jQuery(document).ready(function($) {
+      // enable editing
+//      if (!readonly) {
+//        $('#content').trumbowyg({
+//          removeformatPasted: true,
+//          autogrow: true,
+//          tagsToRemove: ['script', 'link', 'p']
+//        });
+      }
+
       // enable search
       $('#search').autocomplete({
         source: function(request, response) {
@@ -141,6 +151,7 @@
         // set selection functions
         $(document).on('selectionchange', onSelect);
         $(document).on('mousemove', function(ev) {
+          return
           //hide the pop up
           $("#content").css( 'cursor', 'auto');
           for (var i = 0 ; i < clientRects.length ; i++) {
@@ -154,15 +165,8 @@
         })
       }
 
-
-      $(document).click(function(e) {
-        while ($('#content').height() < e.pageY) {
-          $('#content').html($('#content').html() + "<br/>")
-          reload()
-        }
-      })
-
       var pendingRequests = -1
+      var newestMessage = {}
      
       $('#content').on('input', function(e) {
         body = $(this).html()
@@ -194,8 +198,18 @@
 
 			// receive a message though the websocket from the server
       socket.on('{{ key }}' , function(data) {
+        if ("timestamp" in newestMessage) {
+          if (data.timestamp > newestMessage.timestamp) { // if we already have a newest message, then only update when we get a newer message
+            newestMessage.timestamp = data.timestamp
+            newestMessage.body = data.body
+          }
+        } else { // set newest message if it hasn't been set yet
+          newestMessage.timestamp = data.timestamp
+          newestMessage.body = data.body
+        }
+
         if (firstMessage) {
-          firstMessage = false;
+          firstMessage = false
           return
         }
         pendingRequests -= 1
@@ -204,7 +218,7 @@
         }
         if (!pendingRequests) {
           var position = getCurrentCursorPosition('content')
-          $('#content').html(data.body)
+          $('#content').html(newestMessage.body)
           setCurrentCursorPosition(position, 'content')
           reload()
         }
@@ -230,7 +244,6 @@
       function anchorClick(e) {
         window.location = $(this).attr('href')
       }
-
 
       reload()
 

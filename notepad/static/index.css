@@ -6,6 +6,7 @@ body {
 
 #content {
   width: 100%;
+  display: inline-block;
   text-align: left;
 }
 
@@ -33,7 +34,7 @@ div {
 }
 
 .container {
-  width: 800px;
+  width: 831px;
 }
 
 .title {
@@ -52,4 +53,8 @@ div {
 
 a {
   cursor: pointer;
+}
+
+.trumbowyg-box, .trumbowyg-editor {
+  display:inline-block;
 }

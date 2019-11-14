@@ -3,6 +3,7 @@ import urllib
 import logging
 import json
 import random
+from datetime import datetime
 from textwrap import TextWrapper
 
 from sqlalchemy import and_
@@ -40,7 +41,7 @@ def index_view():
         readonly = True
     if key == 'login':
         readonly = False
-    return render_template('index.html', body=content, key=key, readonly=readonly)
+    return render_template('nwe_index.html', body=content, key=key, readonly=readonly)
 
 @app.route('/', methods=['POST'])
 @csrf.exempt
@@ -51,7 +52,7 @@ def index_post():
     if not key:
         key = 'home'
     if key == 'login':
-        if body.strip() == settings.password:
+        if settings.password in body:
             session['loggedin'] = True
             return jsonify({'success': True})
         return jsonify({'success': False})
@@ -59,7 +60,7 @@ def index_post():
     Note.write(key, body)
 
     content = clientEncodeContent(body)
-    socketio.emit(key, {'body': content})
+    socketio.emit(key, {'body': content, 'timestamp': datetime.now().timestamp() * 1000})
     return jsonify({'success': True})
 
 @app.route('/search', methods=['GET'])
@@ -110,7 +111,7 @@ def clientEncodeContent(body, wrap=False):
     replace_index = 0
     for note in notes:
         if note.key:
-            body = re.sub(r"(^| |\n)" +re.escape(note.key) + r"($| |,|\.|\?|!|\n)", r"\1#REPLACE_ME{}#\2".format(replace_index), body, flags=re.I)
+            body = re.sub(r"(^| |\n|>)" +re.escape(note.key) + r"($| |,|\.|\?|!|\n|<)", r"\1#REPLACE_ME{}#\2".format(replace_index), body, flags=re.I)
             replace_dict[replace_index] = note
             replace_index = replace_index + 1
     if wrap:
@@ -123,15 +124,15 @@ def clientEncodeContent(body, wrap=False):
 
     for key, note in replace_dict.items():
         body = body.replace('#REPLACE_ME{}#'.format(key),
-                            '<div class="click">{}</div>'.format(note.key))
+                            '<span class="click">{}</span>'.format(note.key))
 
-    body = re.sub(r"(https?://.*\.(jpg|png|gif))($| |\n)", r'<img src="\1">', body)
+ #   body = re.sub(r"(https?://.*\.(jpg|png|gif))($| |\n)", r'<img src="\1">', body)
 
     #we can't just do a simple substitution after the first one because image urls also match links.
-    for match in re.finditer(r"(https?://[a-zA-Z0-9/:\.?=]*)($| |\n)", body):
-        if match.start() - 1 <= 0 and match.end() + 1 < len(body): # check to make sure it's not out of bounds
-            if body[match.start() - 1] == '"' and body[match.end() + 1] == '"': # check to see whether it's already in some kind of element
-                continue
-        body = body.replace(match.group(), '<a href="{0}">{0}</a>'.format(match.group(1)))
+ #   for match in re.finditer(r"(https?://[a-zA-Z0-9/:\.?=]*)($| |\n)", body):
+ #       if match.start() - 1 <= 0 and match.end() + 1 < len(body): # check to make sure it's not out of bounds
+ #           if body[match.start() - 1] == '"' and body[match.end() + 1] == '"': # check to see whether it's already in some kind of element
+ #               continue
+ #       body = body.replace(match.group(), '<a href="{0}">{0}</a>'.format(match.group(1)))
     body = body.replace('\n', '<br>')
     return body
