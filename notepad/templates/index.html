@@ -169,7 +169,7 @@
       var newestMessage = {}
      
       $('#content').on('input', function(e) {
-        body = $(this).html()
+        body = $('#content').trumbowyg('html')
           .replace(/&nbsp;(?!<)/ig, ' ')
           .replace(/ style="(.)+?"/ig, '')
           .replace(/ class="(.)+?"/ig, '')
@@ -217,9 +217,9 @@
           pendingRequests = 0
         }
         if (!pendingRequests) {
-          var position = getCurrentCursorPosition('content')
-          $('#content').html(newestMessage.body)
-          setCurrentCursorPosition(position, 'content')
+          $('#content').trumbowyg('saveRange');
+          $('#content').trumbowyg('html', newestMessage.body);
+          $('#content').trumbowyg('restoreRange');
           reload()
         }
 			})
