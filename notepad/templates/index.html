@@ -39,12 +39,20 @@
 
 		jQuery(document).ready(function($) {
       // enable editing
-//      if (!readonly) {
-//        $('#content').trumbowyg({
-//          removeformatPasted: true,
-//          autogrow: true,
-//          tagsToRemove: ['script', 'link', 'p']
-//        });
+      if (!readonly) {
+        $('#content').trumbowyg({
+          removeformatPasted: true,
+          autogrow: true,
+          tagsToRemove: ['script', 'link', 'p'],
+          btns: [
+              ['strong', 'em', 'del'],
+              ['superscript', 'subscript'],
+              ['link'],
+              ['insertImage'],
+              ['unorderedList', 'orderedList'],
+              ['horizontalRule']
+          ]
+        });
       }
 
       // enable search
@@ -169,20 +177,13 @@
       var newestMessage = {}
      
       $('#content').on('input', function(e) {
-        body = $('#content').trumbowyg('html')
-          .replace(/&nbsp;(?!<)/ig, ' ')
+        body = $('#content').html()
           .replace(/ style="(.)+?"/ig, '')
           .replace(/ class="(.)+?"/ig, '')
-          .replace(/ href="(.)+?"/ig, '') // removeLinks
           .replace(/\n/ig, '')
-          .replace(/<br>/ig, '\n')
-          .replace(/<(\w)+?>/ig, '')
-          .replace(/<\/div>/ig, '')
-          .replace(/<\/(\w)+?>/ig, '\n')
-          .replace(/<img src="/ig, '') // remove images
-          .replace(/" title="" style="">/ig, '')
-          .replace(/">/ig, '')
-          .replace(/<span /ig, '')
+          .replace(/<br><br>/ig, '')
+          .replace(/<span>/ig, '')
+          .replace(/<\/span>/ig, '')
         waiting = true
         pendingRequests += 1
         $.post("{{ url_for('index_post') }}", {body: body, key: pageKey}, function(data) {
@@ -217,9 +218,9 @@
           pendingRequests = 0
         }
         if (!pendingRequests) {
-          $('#content').trumbowyg('saveRange');
-          $('#content').trumbowyg('html', newestMessage.body);
-          $('#content').trumbowyg('restoreRange');
+          var position = getCurrentCursorPosition('content')
+          $('#content').html(newestMessage.body)
+          setCurrentCursorPosition(position, 'content')
           reload()
         }
 			})

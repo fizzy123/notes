@@ -85,7 +85,7 @@ function getCurrentCursorPosition(parentId) {
 
                 if (node.previousSibling) {
                     node = node.previousSibling;
-                    if (node.nodeName == 'BR') {
+                    if (node.nodeName == 'BR' || (node.childNodes.length === 1 && node.childNodes[0].nodeName == 'BR')) {
                       charCount += 1
                     } else {
                       charCount += node.textContent.length;

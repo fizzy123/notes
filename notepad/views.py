@@ -41,7 +41,7 @@ def index_view():
         readonly = True
     if key == 'login':
         readonly = False
-    return render_template('nwe_index.html', body=content, key=key, readonly=readonly)
+    return render_template('index.html', body=content, key=key, readonly=readonly)
 
 @app.route('/', methods=['POST'])
 @csrf.exempt

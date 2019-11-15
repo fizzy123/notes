@@ -57,4 +57,9 @@ a {
 
 .trumbowyg-box, .trumbowyg-editor {
   display:inline-block;
+  border: none;
+}
+
+.trumbowyg-editor {
+  padding: 0px;
 }
