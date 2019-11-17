@@ -30,12 +30,23 @@
     });
 
     var pageKey = '{{key}}'
+    var iframelyKey = '{{iframelyKey}}'
     var firstMessage = true;
     var divCloseLength = "</div>".length
     var selectionStart = 0
     var selectionEnd = 0
     var clientRects = []
     var selectionText = ""
+
+    function validURL(str) {
+      var pattern = new RegExp('^(https?:\\/\\/)?'+ // protocol
+        '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // domain name
+        '((\\d{1,3}\\.){3}\\d{1,3}))'+ // OR ip (v4) address
+        '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
+        '(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
+        '(\\#[-a-z\\d_]*)?$','i'); // fragment locator
+        return !!pattern.test(str);
+    }
 
 		jQuery(document).ready(function($) {
       // enable editing
@@ -175,8 +186,8 @@
 
       var pendingRequests = -1
       var newestMessage = {}
-     
-      $('#content').on('input', function(e) {
+
+      function postBody(e) {
         body = $('#content').html()
           .replace(/ style="(.)+?"/ig, '')
           .replace(/ class="(.)+?"/ig, '')
@@ -191,7 +202,9 @@
             window.location = '/'
           }
         });
-      });
+      }
+     
+      $('#content').on('input', postBody);
 
 			socket.on('disconnect', function(data) {
 				console.log('Websocket was disconnected: ' + JSON.stringify(data));
@@ -253,6 +266,18 @@
         $('.click').click(linkClick)
         $('a').click(anchorClick)
       }
+
+      $("#content").on("paste", function(e){
+        var pastedData = e.originalEvent.clipboardData.getData('text');
+        if (validURL(pastedData)) {
+          e.stopImmediatePropagation();
+          $.get('https://iframe.ly/api/oembed?url=' + encodeURIComponent(pastedData) + '&key=' + iframelyKey, function(data) {
+                     $('#content').html($('#content').html().replace(pastedData, "<div class=\"embed\"><div contenteditable=\"false\">" + data.html + "</div></div>"))
+            postBody()
+          });             
+          return false
+        }
+      });
 
       $("#content").focus()
 		});

@@ -3,6 +3,7 @@ import urllib
 import logging
 import json
 import random
+import hashlib
 from datetime import datetime
 from textwrap import TextWrapper
 
@@ -41,7 +42,8 @@ def index_view():
         readonly = True
     if key == 'login':
         readonly = False
-    return render_template('index.html', body=content, key=key, readonly=readonly)
+    iframelyKey = hashlib.md5(settings.IFRAMELY_API_KEY.encode('utf-8')).hexdigest()
+    return render_template('index.html', body=content, key=key, readonly=readonly, iframelyKey=iframelyKey)
 
 @app.route('/', methods=['POST'])
 @csrf.exempt

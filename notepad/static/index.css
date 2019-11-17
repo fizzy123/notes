@@ -18,6 +18,10 @@ div {
   display: -webkit-inline-box;
 }
 
+.trumbowyg-editor > div > div {
+  margin: 0px 1px;
+}
+
 .click {
   cursor: pointer;
 }
